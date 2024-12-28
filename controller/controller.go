@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 )
 
 type BindManager struct {
-	zoneDir string
+	zoneDir       string
+	namedConfFile string
 }
 
 type RecordType string
@@ -23,8 +25,8 @@ const (
 	PTR   RecordType = "PTR"
 )
 
-func NewBindManager(zoneDir string) *BindManager {
-	return &BindManager{zoneDir: zoneDir}
+func NewBindManager(zoneDir string, namedConfFile string) *BindManager {
+	return &BindManager{zoneDir: zoneDir, namedConfFile: namedConfFile}
 }
 
 func (bm *BindManager) validateDomain(domain string) error {
@@ -56,7 +58,10 @@ func (bm *BindManager) AddDomain(domain string) error {
 	}
 	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
 	record := fmt.Sprintf("$TTL 86400\n@ IN SOA ns1.%s. admin.%s. ( 2023100101 3600 1800 604800 86400 )\n", domain, domain)
-	return bm.createZoneFile(zoneFile, record)
+	if err := bm.createZoneFile(zoneFile, record); err != nil {
+		return err
+	}
+	return bm.addZone(domain)
 }
 
 func (bm *BindManager) DeleteDomain(domain string) error {
@@ -71,7 +76,10 @@ func (bm *BindManager) DeleteDomain(domain string) error {
 		return errors.New("domain does not exist")
 	}
 	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
-	return os.Remove(zoneFile)
+	if err := os.Remove(zoneFile); err != nil {
+		return err
+	}
+	return bm.deleteZone(domain)
 }
 
 func (bm *BindManager) AddRecord(domain string, recordType RecordType, name, value string, ttl int) error {
@@ -121,7 +129,7 @@ func (bm *BindManager) createZoneFile(zoneFile, record string) error {
 	if _, err := file.WriteString(record); err != nil {
 		return err
 	}
-	return nil
+	return bm.reloadBind()
 }
 
 func (bm *BindManager) addRecord(zoneFile, record string) error {
@@ -133,7 +141,7 @@ func (bm *BindManager) addRecord(zoneFile, record string) error {
 	if _, err := file.WriteString(record + "\n"); err != nil {
 		return err
 	}
-	return nil
+	return bm.reloadBind()
 }
 
 func (bm *BindManager) deleteRecord(zoneFile, name string) error {
@@ -148,7 +156,10 @@ func (bm *BindManager) deleteRecord(zoneFile, name string) error {
 			newLines = append(newLines, line)
 		}
 	}
-	return os.WriteFile(zoneFile, []byte(strings.Join(newLines, "\n")), 0644)
+	if err := os.WriteFile(zoneFile, []byte(strings.Join(newLines, "\n")), 0644); err != nil {
+		return err
+	}
+	return bm.reloadBind()
 }
 
 func contains(slice []RecordType, item RecordType) bool {
@@ -158,4 +169,66 @@ func contains(slice []RecordType, item RecordType) bool {
 		}
 	}
 	return false
+}
+func (bm *BindManager) addZone(domain string) error {
+	zoneEntry := fmt.Sprintf("zone \"%s\" {\n\ttype master;\n\tfile \"%s/db.%s\";\n};\n", domain, bm.zoneDir, domain)
+
+	data, err := os.ReadFile(bm.namedConfFile)
+	if err != nil {
+		return err
+	}
+	if strings.Contains(string(data), domain) {
+		return errors.New("zone already exists in named.conf.local")
+	}
+
+	file, err := os.OpenFile(bm.namedConfFile, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if _, err := file.WriteString(zoneEntry); err != nil {
+		return err
+	}
+
+	return bm.reloadBind()
+}
+
+func (bm *BindManager) deleteZone(domain string) error {
+	data, err := os.ReadFile(bm.namedConfFile)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(data), "\n")
+	var newLines []string
+	zoneEntry := fmt.Sprintf("zone \"%s\" {", domain)
+
+	skipNextLines := false
+	for _, line := range lines {
+		if skipNextLines {
+			if line == "};" {
+				skipNextLines = false
+			}
+			continue
+		}
+
+		if strings.HasPrefix(line, zoneEntry) {
+			skipNextLines = true
+			continue
+		}
+
+		newLines = append(newLines, line)
+	}
+
+	if err := os.WriteFile(bm.namedConfFile, []byte(strings.Join(newLines, "\n")), 0644); err != nil {
+		return err
+	}
+	return bm.reloadBind()
+}
+
+func (bm *BindManager) reloadBind() error {
+	cmd := exec.Command("rndc", "reload")
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return nil
 }
