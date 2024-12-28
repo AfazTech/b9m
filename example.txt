@@ -1,0 +1,29 @@
+$TTL    86400
+@       IN      SOA     ns1.example.com. admin.example.com. (
+                        2023010101 ; Serial
+                        7200       ; Refresh
+                        3600       ; Retry
+                        1209600    ; Expire
+                        86400      ; Minimum TTL
+                        )
+
+; Name servers
+@       IN      NS      ns1.example.com.
+@       IN      NS      ns2.example.com.
+
+; A records
+@       IN      A       192.0.2.1
+www     IN      A       192.0.2.1
+mail    IN      A       192.0.2.2
+
+; AAAA record
+@       IN      AAAA    2001:db8::1
+
+; CNAME record
+ftp     IN      CNAME   www.example.com.
+
+; MX record
+@       IN      MX      10 mail.example.com.
+
+; TXT record
+@       IN      TXT     "v=spf1 include:_spf.example.com ~all"
