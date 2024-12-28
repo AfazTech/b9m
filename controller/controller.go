@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/miekg/dns"
 )
 
 type BindManager struct {
@@ -36,6 +38,28 @@ func (bm *BindManager) validateDomain(domain string) error {
 	}
 	return nil
 }
+func (bm *BindManager) validateARecord(nsName string) error {
+	client := new(dns.Client)
+	m := new(dns.Msg)
+	m.SetQuestion(dns.Fqdn(nsName), dns.TypeA)
+	m.RecursionDesired = true
+
+	r, _, err := client.Exchange(m, "8.8.8.8:53")
+	if err != nil {
+		return errors.New("failed to query DNS")
+	}
+
+	if len(r.Answer) == 0 {
+		return errors.New("A record for ns does not exist")
+	}
+
+	for _, ans := range r.Answer {
+		if _, ok := ans.(*dns.A); ok {
+			return nil
+		}
+	}
+	return errors.New("A record for ns does not exist")
+}
 func (bm *BindManager) validateIP(ip string) error {
 	parsedIP := net.ParseIP(ip)
 	if parsedIP == nil {
@@ -53,13 +77,17 @@ func (bm *BindManager) domainExists(domain string) (bool, error) {
 	return err == nil, err
 }
 
-func (bm *BindManager) AddDomain(domain string, nsIP string) error {
+func (bm *BindManager) AddDomain(domain string, ns1 string, ns2 string) error {
 	if err := bm.validateDomain(domain); err != nil {
 		return err
 	}
-	if err := bm.validateIP(nsIP); err != nil {
+	if err := bm.validateDomain(ns1); err != nil {
 		return err
 	}
+	if err := bm.validateDomain(ns2); err != nil {
+		return err
+	}
+
 	exists, err := bm.domainExists(domain)
 	if err != nil {
 		return err
@@ -67,12 +95,20 @@ func (bm *BindManager) AddDomain(domain string, nsIP string) error {
 	if exists {
 		return errors.New("domain already exists")
 	}
+
+	if err := bm.validateARecord(ns1); err != nil {
+		return err
+	}
+
+	if err := bm.validateARecord(ns2); err != nil {
+		return err
+	}
+
 	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
-	record := fmt.Sprintf("$TTL 86400\n@ IN SOA ns1.%s. admin.%s. ( 2023100101 3600 1800 604800 86400 )\n", domain, domain)
-	record += fmt.Sprintf("@ IN NS ns1.%s.\n", domain)
-	record += fmt.Sprintf("@ IN NS ns2.%s.\n", domain)
-	record += fmt.Sprintf("ns1 IN A %s\n", nsIP)
-	record += fmt.Sprintf("ns2 IN A %s\n", nsIP)
+	record := fmt.Sprintf("$TTL 86400\n@ IN SOA %s. admin.%s. ( 2023100101 86400 3600 604800 86400 )\n", ns1, domain)
+	record += fmt.Sprintf("@ IN NS %s.\n", ns1)
+	record += fmt.Sprintf("@ IN NS %s.\n", ns2)
+
 	if err := bm.createZoneFile(zoneFile, record); err != nil {
 		return err
 	}
