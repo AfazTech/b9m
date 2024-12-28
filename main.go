@@ -3,17 +3,20 @@ package main
 import (
 	"log"
 
+	"github.com/gin-gonic/gin"
+	"github.com/imafaz/B9CA/api"
 	"github.com/imafaz/B9CA/controller"
 )
 
 func main() {
-	cn := controller.NewBindManager(`/etc/bind/zones`, `/etc/bind/named.conf.local`)
-	err := cn.AddDomain(`afaz.me`, "ns581.servercap.com", "ns591.servercap.com")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = cn.AddRecord(`afaz.me`, controller.A, "www", "8.8.8.8", 8600)
-	if err != nil {
-		log.Fatal(err)
+
+	bindManager := controller.NewBindManager(`/etc/bind/zones`, `/etc/bind/named.conf.local`)
+	router := gin.Default()
+
+	api := api.NewAPI(bindManager)
+	api.SetupRoutes(router)
+
+	if err := router.Run(":8080"); err != nil {
+		log.Fatalf("Failed to run server: %v", err)
 	}
 }

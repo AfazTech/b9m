@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/miekg/dns"
@@ -16,7 +17,12 @@ type BindManager struct {
 	zoneDir       string
 	namedConfFile string
 }
-
+type DNSRecord struct {
+	Name  string
+	TTL   int
+	Type  RecordType
+	Value string
+}
 type RecordType string
 
 const (
@@ -46,11 +52,11 @@ func (bm *BindManager) validateARecord(nsName string) error {
 
 	r, _, err := client.Exchange(m, "8.8.8.8:53")
 	if err != nil {
-		return errors.New("failed to query DNS")
+		return errors.New("failed to query dns")
 	}
 
 	if len(r.Answer) == 0 {
-		return errors.New("A record for ns does not exist")
+		return errors.New("a record for ns does not exist")
 	}
 
 	for _, ans := range r.Answer {
@@ -58,7 +64,7 @@ func (bm *BindManager) validateARecord(nsName string) error {
 			return nil
 		}
 	}
-	return errors.New("A record for ns does not exist")
+	return errors.New("a record for ns does not exist")
 }
 func (bm *BindManager) validateIP(ip string) error {
 	parsedIP := net.ParseIP(ip)
@@ -287,4 +293,59 @@ func (bm *BindManager) reloadBind() error {
 		return err
 	}
 	return nil
+}
+func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
+	if err := bm.validateDomain(domain); err != nil {
+		return nil, err
+	}
+
+	exists, err := bm.domainExists(domain)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.New("domain does not exist")
+	}
+
+	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
+	data, err := os.ReadFile(zoneFile)
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(string(data), "\n")
+	var records []DNSRecord
+	skipCount := 0
+
+	for _, line := range lines {
+
+		if strings.HasPrefix(line, "@ IN SOA") || strings.HasPrefix(line, "@ IN NS") {
+			skipCount++
+			if skipCount > 2 {
+				continue
+			}
+		}
+
+		if line != "" {
+			parts := strings.Fields(line)
+			if len(parts) < 4 {
+				continue
+			}
+
+			ttl, err := strconv.Atoi(parts[1])
+			if err != nil {
+				continue
+			}
+
+			record := DNSRecord{
+				Name:  parts[0],
+				TTL:   ttl,
+				Type:  RecordType(parts[2]),
+				Value: parts[3],
+			}
+			records = append(records, record)
+		}
+	}
+
+	return records, nil
 }
