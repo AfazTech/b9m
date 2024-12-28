@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"regexp"
@@ -35,6 +36,13 @@ func (bm *BindManager) validateDomain(domain string) error {
 	}
 	return nil
 }
+func (bm *BindManager) validateIP(ip string) error {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return errors.New("invalid IP address format")
+	}
+	return nil
+}
 
 func (bm *BindManager) domainExists(domain string) (bool, error) {
 	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
@@ -45,8 +53,11 @@ func (bm *BindManager) domainExists(domain string) (bool, error) {
 	return err == nil, err
 }
 
-func (bm *BindManager) AddDomain(domain string) error {
+func (bm *BindManager) AddDomain(domain string, nsIP string) error {
 	if err := bm.validateDomain(domain); err != nil {
+		return err
+	}
+	if err := bm.validateIP(nsIP); err != nil {
 		return err
 	}
 	exists, err := bm.domainExists(domain)
@@ -58,6 +69,10 @@ func (bm *BindManager) AddDomain(domain string) error {
 	}
 	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
 	record := fmt.Sprintf("$TTL 86400\n@ IN SOA ns1.%s. admin.%s. ( 2023100101 3600 1800 604800 86400 )\n", domain, domain)
+	record += fmt.Sprintf("@ IN NS ns1.%s.\n", domain)
+	record += fmt.Sprintf("@ IN NS ns2.%s.\n", domain)
+	record += fmt.Sprintf("ns1 IN A %s\n", nsIP)
+	record += fmt.Sprintf("ns2 IN A %s\n", nsIP)
 	if err := bm.createZoneFile(zoneFile, record); err != nil {
 		return err
 	}
@@ -100,8 +115,13 @@ func (bm *BindManager) AddRecord(domain string, recordType RecordType, name, val
 	if !contains(validRecordTypes, recordType) {
 		return errors.New("invalid record type")
 	}
+	if recordType == A {
+		if err := bm.validateIP(value); err != nil {
+			return err
+		}
+	}
 	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
-	record := fmt.Sprintf("%s IN %s %d %s", name, recordType, ttl, value)
+	record := fmt.Sprintf("%s %d IN %s %s", name, ttl, recordType, value)
 	return bm.addRecord(zoneFile, record)
 }
 
