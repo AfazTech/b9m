@@ -318,6 +318,10 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 	skipCount := 0
 
 	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
 
 		if strings.HasPrefix(line, "@ IN SOA") || strings.HasPrefix(line, "@ IN NS") {
 			skipCount++
@@ -326,25 +330,26 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 			}
 		}
 
-		if line != "" {
-			parts := strings.Fields(line)
-			if len(parts) < 4 {
-				continue
-			}
-
-			ttl, err := strconv.Atoi(parts[1])
-			if err != nil {
-				continue
-			}
-
-			record := DNSRecord{
-				Name:  parts[0],
-				TTL:   ttl,
-				Type:  RecordType(parts[2]),
-				Value: parts[3],
-			}
-			records = append(records, record)
+		parts := strings.Fields(line)
+		if len(parts) < 4 {
+			continue
 		}
+
+		name := parts[0]
+		ttl, err := strconv.Atoi(parts[1])
+		if err != nil {
+			continue
+		}
+		recordType := RecordType(parts[2])
+		value := strings.Join(parts[3:], " ")
+
+		record := DNSRecord{
+			Name:  name,
+			TTL:   ttl,
+			Type:  recordType,
+			Value: value,
+		}
+		records = append(records, record)
 	}
 
 	return records, nil
