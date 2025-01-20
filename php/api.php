@@ -4,7 +4,7 @@ class DNSManager {
     private $apiUrl;
 
     public function __construct($apiUrl) {
-        $this->apiUrl = rtrim($apiUrl, '/'); // اطمینان از اینکه URL بدون اسلش انتهایی است
+        $this->apiUrl = rtrim($apiUrl, '/');
     }
 
     private function sendRequest($method, $endpoint, $data = null) {
