@@ -16,6 +16,7 @@ import (
 type BindManager struct {
 	zoneDir       string
 	namedConfFile string
+	client        *dns.Client
 }
 type DNSRecord struct {
 	Name  string
@@ -35,36 +36,29 @@ const (
 )
 
 func NewBindManager(zoneDir string, namedConfFile string) *BindManager {
-	return &BindManager{zoneDir: zoneDir, namedConfFile: namedConfFile}
+	return &BindManager{
+		zoneDir:       zoneDir,
+		namedConfFile: namedConfFile,
+		client:        new(dns.Client),
+	}
 }
 
 func (bm *BindManager) validateDomain(domain string) error {
 	if matched, _ := regexp.MatchString(`^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$`, domain); !matched {
-		return errors.New("invalid domain format")
+		return fmt.Errorf("invalid domain format: %s", domain)
 	}
 	return nil
 }
 func (bm *BindManager) validateARecord(nsName string) error {
-	client := new(dns.Client)
 	m := new(dns.Msg)
 	m.SetQuestion(dns.Fqdn(nsName), dns.TypeA)
 	m.RecursionDesired = true
 
-	r, _, err := client.Exchange(m, "8.8.8.8:53")
+	_, _, err := bm.client.Exchange(m, "8.8.8.8:53")
 	if err != nil {
-		return errors.New("failed to query dns")
+		return fmt.Errorf("failed to resolve A record for %s: %w", nsName, err)
 	}
-
-	if len(r.Answer) == 0 {
-		return errors.New("a record for ns does not exist")
-	}
-
-	for _, ans := range r.Answer {
-		if _, ok := ans.(*dns.A); ok {
-			return nil
-		}
-	}
-	return errors.New("a record for ns does not exist")
+	return nil
 }
 func (bm *BindManager) validateIP(ip string) error {
 	parsedIP := net.ParseIP(ip)
