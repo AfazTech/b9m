@@ -157,6 +157,9 @@ func (bm *BindManager) AddRecord(domain string, recordType RecordType, name, val
 		}
 	}
 	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
+	if !strings.HasSuffix(name, ".") {
+		name += "."
+	}
 	record := fmt.Sprintf("%s %d IN %s %s", name, ttl, recordType, value)
 	return bm.addRecord(zoneFile, record)
 }
