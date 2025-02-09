@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,13 +10,24 @@ import (
 
 type API struct {
 	bindManager *controller.BindManager
+	apiKey      string
 }
 
-func NewAPI(bindManager *controller.BindManager) *API {
-	return &API{bindManager: bindManager}
+func NewAPI(bindManager *controller.BindManager, apiKey string) *API {
+	return &API{bindManager: bindManager, apiKey: apiKey}
+}
+
+func (api *API) authMiddleware(c *gin.Context) {
+	if c.GetHeader("Authorization") != "Bearer "+api.apiKey {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.Abort()
+		return
+	}
+	c.Next()
 }
 
 func (api *API) SetupRoutes(router *gin.Engine) {
+	router.Use(api.authMiddleware)
 	router.POST("/domains", api.AddDomain)
 	router.DELETE("/domains/:domain", api.DeleteDomain)
 	router.POST("/domains/:domain/records", api.AddRecord)
@@ -99,4 +111,16 @@ func (api *API) GetAllRecords(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, records)
+}
+
+func StartServer(port string, apiKey string) {
+	bindManager := controller.NewBindManager("/etc/bind/zones", "/etc/bind/named.conf.local")
+	api := NewAPI(bindManager, apiKey)
+	router := gin.Default()
+	api.SetupRoutes(router)
+
+	log.Printf("Starting API server on port %s", port)
+	if err := router.Run(":" + port); err != nil {
+		log.Fatalf("Failed to run server: %v", err)
+	}
 }

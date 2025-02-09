@@ -1,2 +1,2 @@
 apt update
-apt install bind9 jq -y
+apt install bind9 -y
