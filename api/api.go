@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/imafaz/B9CA/controller"
+	"github.com/imafaz/b9m/controller"
 )
 
 type API struct {
@@ -33,8 +33,66 @@ func (api *API) SetupRoutes(router *gin.Engine) {
 	router.POST("/domains/:domain/records", api.AddRecord)
 	router.DELETE("/domains/:domain/records/:name", api.DeleteRecord)
 	router.GET("/domains/:domain/records", api.GetAllRecords)
+	router.POST("/reload", api.ReloadBind)
+	router.POST("/restart", api.RestartBind)
+	router.POST("/stop", api.StopBind)
+	router.POST("/start", api.StartBind)
+	router.GET("/status", api.StatusBind)
+	router.GET("/stats", api.GetStats)
+}
+func (api *API) ReloadBind(c *gin.Context) {
+	err := api.bindManager.ReloadBind()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Bind reloaded successfully"})
 }
 
+func (api *API) RestartBind(c *gin.Context) {
+	err := api.bindManager.RestartBind()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Bind restarted successfully"})
+}
+
+func (api *API) StopBind(c *gin.Context) {
+	err := api.bindManager.StopBind()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Bind stopped successfully"})
+}
+
+func (api *API) StartBind(c *gin.Context) {
+	err := api.bindManager.StartBind()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Bind started successfully"})
+}
+
+func (api *API) StatusBind(c *gin.Context) {
+	status, err := api.bindManager.StatusBind()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": status})
+}
+
+func (api *API) GetStats(c *gin.Context) {
+	stats, err := api.bindManager.GetStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
 func (api *API) AddDomain(c *gin.Context) {
 	var input struct {
 		Domain string `json:"domain" binding:"required"`

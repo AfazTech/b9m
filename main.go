@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/imafaz/B9CA/cli"
+	"github.com/imafaz/b9m/cli"
 )
 
 func main() {

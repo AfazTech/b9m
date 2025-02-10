@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -350,4 +351,67 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 	}
 
 	return records, nil
+}
+
+func (bm *BindManager) ReloadBind() error {
+	cmd := exec.Command("rndc", "reload")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Failed to Reload Bind: %v", err)
+	}
+	return nil
+}
+
+func (bm *BindManager) RestartBind() error {
+	cmd := exec.Command("systemctl", "restart", "bind9")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Failed to restart Bind: %v", err)
+	}
+	return nil
+}
+
+func (bm *BindManager) StopBind() error {
+	cmd := exec.Command("systemctl", "stop", "bind9")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Failed to stop bind: %v", err)
+	}
+	return nil
+}
+
+func (bm *BindManager) StartBind() error {
+	cmd := exec.Command("systemctl", "start", "bind9")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Failed to start Bind: %v", err)
+	}
+	return nil
+}
+
+func (bm *BindManager) StatusBind() (string, error) {
+	cmd := exec.Command("systemctl", "is-active", "bind9")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("Failed to get bind status: %v", err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+type Stats struct {
+	TotalZones   int `json:"total_zones"`
+	TotalRouters int `json:"total_routers"`
+}
+
+func (bm *BindManager) GetStats() (Stats, error) {
+	zones, err := ioutil.ReadDir(bm.zoneDir)
+	if err != nil {
+		return Stats{}, errors.New("failed to read zone directory")
+	}
+	namedConfData, err := ioutil.ReadFile(bm.namedConfFile)
+	if err != nil {
+		return Stats{}, errors.New("failed to read named.conf.local")
+	}
+	routerCount := strings.Count(string(namedConfData), "zone ")
+
+	return Stats{
+		TotalZones:   len(zones),
+		TotalRouters: routerCount,
+	}, nil
 }

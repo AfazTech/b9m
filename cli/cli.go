@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/imafaz/B9CA/api"
-	"github.com/imafaz/B9CA/controller"
+	"github.com/imafaz/b9m/api"
+	"github.com/imafaz/b9m/controller"
 	"github.com/spf13/cobra"
 )
 
@@ -96,8 +96,91 @@ var startAPICmd = &cobra.Command{
 	},
 }
 
+// New commands for Bind operations
+var reloadCmd = &cobra.Command{
+	Use:   "reload",
+	Short: "Reload BIND9 configuration",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := bindManager.ReloadBind(); err != nil {
+			log.Fatalf("Error reloading BIND: %v", err)
+		}
+		fmt.Println("BIND9 reloaded successfully.")
+	},
+}
+
+var restartCmd = &cobra.Command{
+	Use:   "restart",
+	Short: "Restart BIND9 service",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := bindManager.RestartBind(); err != nil {
+			log.Fatalf("Error restarting BIND: %v", err)
+		}
+		fmt.Println("BIND9 restarted successfully.")
+	},
+}
+
+var stopCmd = &cobra.Command{
+	Use:   "stop",
+	Short: "Stop BIND9 service",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := bindManager.StopBind(); err != nil {
+			log.Fatalf("Error stopping BIND: %v", err)
+		}
+		fmt.Println("BIND9 stopped successfully.")
+	},
+}
+
+var startCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start BIND9 service",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := bindManager.StartBind(); err != nil {
+			log.Fatalf("Error starting BIND: %v", err)
+		}
+		fmt.Println("BIND9 started successfully.")
+	},
+}
+
+var statusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Get the status of BIND9 service",
+	Run: func(cmd *cobra.Command, args []string) {
+		status, err := bindManager.StatusBind()
+		if err != nil {
+			log.Fatalf("Error fetching status: %v", err)
+		}
+		fmt.Printf("BIND9 status: %s\n", status)
+	},
+}
+
+var statsCmd = &cobra.Command{
+	Use:   "stats",
+	Short: "Get statistics of BIND9",
+	Run: func(cmd *cobra.Command, args []string) {
+		stats, err := bindManager.GetStats()
+		if err != nil {
+			log.Fatalf("Error fetching stats: %v", err)
+		}
+		fmt.Printf("Total Zones: %d\n", stats.TotalZones)
+		fmt.Printf("Total Routers: %d\n", stats.TotalRouters)
+	},
+}
+
 func init() {
-	rootCmd.AddCommand(addDomainCmd, deleteDomainCmd, addRecordCmd, deleteRecordCmd, getRecordsCmd, startAPICmd)
+	rootCmd.AddCommand(
+		addDomainCmd,
+		deleteDomainCmd,
+		addRecordCmd,
+		deleteRecordCmd,
+		getRecordsCmd,
+		startAPICmd,
+		reloadCmd,
+		restartCmd,
+		stopCmd,
+		startCmd,
+		statusCmd,
+		statsCmd,
+	)
 }
 
 func StartCLI() {
