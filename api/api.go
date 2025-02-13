@@ -168,7 +168,7 @@ func (api *API) GetAllRecords(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, records)
+	c.JSON(http.StatusOK, gin.H{"ok": true, "records": records})
 }
 
 func StartServer(port string, apiKey string) {
