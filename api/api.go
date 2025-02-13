@@ -19,7 +19,7 @@ func NewAPI(bindManager *controller.BindManager, apiKey string) *API {
 
 func (api *API) authMiddleware(c *gin.Context) {
 	if c.GetHeader("Authorization") != "Bearer "+api.apiKey {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"ok": true, "error": "Unauthorized"})
 		c.Abort()
 		return
 	}
@@ -43,43 +43,43 @@ func (api *API) SetupRoutes(router *gin.Engine) {
 func (api *API) ReloadBind(c *gin.Context) {
 	err := api.bindManager.ReloadBind()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Bind reloaded successfully"})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Bind reloaded successfully"})
 }
 
 func (api *API) RestartBind(c *gin.Context) {
 	err := api.bindManager.RestartBind()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Bind restarted successfully"})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Bind restarted successfully"})
 }
 
 func (api *API) StopBind(c *gin.Context) {
 	err := api.bindManager.StopBind()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Bind stopped successfully"})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Bind stopped successfully"})
 }
 
 func (api *API) StartBind(c *gin.Context) {
 	err := api.bindManager.StartBind()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Bind started successfully"})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Bind started successfully"})
 }
 
 func (api *API) StatusBind(c *gin.Context) {
 	status, err := api.bindManager.StatusBind()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": status})
@@ -88,7 +88,7 @@ func (api *API) StatusBind(c *gin.Context) {
 func (api *API) GetStats(c *gin.Context) {
 	stats, err := api.bindManager.GetStats()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, stats)
@@ -101,28 +101,28 @@ func (api *API) AddDomain(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
 
 	err := api.bindManager.AddDomain(input.Domain, input.NS1, input.NS2)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Domain added successfully"})
+	c.JSON(http.StatusCreated, gin.H{"ok": true, "message": "Domain added successfully"})
 }
 
 func (api *API) DeleteDomain(c *gin.Context) {
 	domain := c.Param("domain")
 	err := api.bindManager.DeleteDomain(domain)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Domain deleted successfully"})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Domain deleted successfully"})
 }
 
 func (api *API) AddRecord(c *gin.Context) {
@@ -134,18 +134,18 @@ func (api *API) AddRecord(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
 
 	domain := c.Param("domain")
 	err := api.bindManager.AddRecord(domain, input.Type, input.Name, input.Value, input.TTL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Record added successfully"})
+	c.JSON(http.StatusCreated, gin.H{"ok": true, "message": "Record added successfully"})
 }
 
 func (api *API) DeleteRecord(c *gin.Context) {
@@ -153,18 +153,18 @@ func (api *API) DeleteRecord(c *gin.Context) {
 	name := c.Param("name")
 	err := api.bindManager.DeleteRecord(domain, name)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Record deleted successfully"})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Record deleted successfully"})
 }
 
 func (api *API) GetAllRecords(c *gin.Context) {
 	domain := c.Param("domain")
 	records, err := api.bindManager.GetAllRecords(domain)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "error": err.Error()})
 		return
 	}
 
