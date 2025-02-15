@@ -127,6 +127,20 @@ func (bm *BindManager) AddDomain(domain string, ns1 string, ns2 string) error {
 	}
 	return bm.addZone(domain)
 }
+func (bm *BindManager) recordExists(zoneFile, sub string) (bool, error) {
+	data, err := os.ReadFile(zoneFile)
+	if err != nil {
+		return false, err
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, fmt.Sprintf("%s.", sub)) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
 func (bm *BindManager) DeleteDomain(domain string) error {
 	if err := bm.validateDomain(domain); err != nil {
@@ -172,7 +186,17 @@ func (bm *BindManager) AddRecord(domain string, recordType RecordType, sub, valu
 			return err
 		}
 	}
+
 	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
+
+	recordExists, err := bm.recordExists(zoneFile, sub)
+	if err != nil {
+		return err
+	}
+	if recordExists {
+		return fmt.Errorf("record with subdomain %s already exists", sub)
+	}
+
 	record := fmt.Sprintf("%s.%s. %d IN %s %s", sub, domain, ttl, recordType, value)
 	return bm.addRecord(zoneFile, record)
 }
