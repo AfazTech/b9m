@@ -3,6 +3,7 @@ package api
 import (
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/imafaz/b9m/controller"
@@ -130,7 +131,7 @@ func (api *API) AddRecord(c *gin.Context) {
 		Name  string                `json:"name" binding:"required"`
 		Type  controller.RecordType `json:"type" binding:"required"`
 		Value string                `json:"value" binding:"required"`
-		TTL   int                   `json:"ttl" binding:"required"`
+		TTL   string                `json:"ttl" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -138,8 +139,14 @@ func (api *API) AddRecord(c *gin.Context) {
 		return
 	}
 
+	ttl, err := strconv.Atoi(input.TTL)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"ok": false, "message": "ttl must be a valid integer"})
+		return
+	}
+
 	domain := c.Param("domain")
-	err := api.bindManager.AddRecord(domain, input.Type, input.Name, input.Value, input.TTL)
+	err = api.bindManager.AddRecord(domain, input.Type, input.Name, input.Value, ttl)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
