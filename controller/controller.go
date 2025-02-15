@@ -19,12 +19,14 @@ type BindManager struct {
 	namedConfFile string
 	client        *dns.Client
 }
+
 type DNSRecord struct {
 	Name  string
 	TTL   int
 	Type  RecordType
 	Value string
 }
+
 type RecordType string
 
 const (
@@ -44,12 +46,21 @@ func NewBindManager(zoneDir string, namedConfFile string) *BindManager {
 	}
 }
 
+func (bm *BindManager) validateSubdomain(sub string) error {
+	matched, _ := regexp.MatchString(`^[a-zA-Z0-9-]{1,63}$`, sub)
+	if !matched {
+		return fmt.Errorf("invalid subdomain format: %s", sub)
+	}
+	return nil
+}
+
 func (bm *BindManager) validateDomain(domain string) error {
 	if matched, _ := regexp.MatchString(`^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$`, domain); !matched {
 		return fmt.Errorf("invalid domain format: %s", domain)
 	}
 	return nil
 }
+
 func (bm *BindManager) validateARecord(nsName string) error {
 	m := new(dns.Msg)
 	m.SetQuestion(dns.Fqdn(nsName), dns.TypeA)
@@ -61,6 +72,7 @@ func (bm *BindManager) validateARecord(nsName string) error {
 	}
 	return nil
 }
+
 func (bm *BindManager) validateIP(ip string) error {
 	parsedIP := net.ParseIP(ip)
 	if parsedIP == nil {
@@ -134,8 +146,11 @@ func (bm *BindManager) DeleteDomain(domain string) error {
 	return bm.deleteZone(domain)
 }
 
-func (bm *BindManager) AddRecord(domain string, recordType RecordType, name, value string, ttl int) error {
+func (bm *BindManager) AddRecord(domain string, recordType RecordType, sub, value string, ttl int) error {
 	if err := bm.validateDomain(domain); err != nil {
+		return err
+	}
+	if err := bm.validateSubdomain(sub); err != nil {
 		return err
 	}
 	exists, err := bm.domainExists(domain)
@@ -158,15 +173,15 @@ func (bm *BindManager) AddRecord(domain string, recordType RecordType, name, val
 		}
 	}
 	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
-	if !strings.HasSuffix(name, ".") {
-		name += "."
-	}
-	record := fmt.Sprintf("%s %d IN %s %s", name, ttl, recordType, value)
+	record := fmt.Sprintf("%s.%s. %d IN %s %s", sub, domain, ttl, recordType, value)
 	return bm.addRecord(zoneFile, record)
 }
 
-func (bm *BindManager) DeleteRecord(domain, name string) error {
+func (bm *BindManager) DeleteRecord(domain, sub string) error {
 	if err := bm.validateDomain(domain); err != nil {
+		return err
+	}
+	if err := bm.validateSubdomain(sub); err != nil {
 		return err
 	}
 	exists, err := bm.domainExists(domain)
@@ -177,7 +192,7 @@ func (bm *BindManager) DeleteRecord(domain, name string) error {
 		return errors.New("domain does not exist")
 	}
 	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
-	return bm.deleteRecord(zoneFile, name+".")
+	return bm.deleteRecord(zoneFile, fmt.Sprintf("%s.%s.", sub, domain))
 }
 
 func (bm *BindManager) createZoneFile(zoneFile, record string) error {
@@ -230,6 +245,7 @@ func contains(slice []RecordType, item RecordType) bool {
 	}
 	return false
 }
+
 func (bm *BindManager) addZone(domain string) error {
 	zoneEntry := fmt.Sprintf("zone \"%s\" {\n\ttype master;\n\tfile \"%s/db.%s\";\n};\n", domain, bm.zoneDir, domain)
 
@@ -292,6 +308,7 @@ func (bm *BindManager) reloadBind() error {
 	}
 	return nil
 }
+
 func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 	if err := bm.validateDomain(domain); err != nil {
 		return nil, err
