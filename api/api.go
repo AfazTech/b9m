@@ -34,6 +34,7 @@ func (api *API) SetupRoutes(router *gin.Engine) {
 	router.POST("/domains/:domain/records", api.AddRecord)
 	router.DELETE("/domains/:domain/records/:name", api.DeleteRecord)
 	router.GET("/domains/:domain/records", api.GetAllRecords)
+	router.GET("/domains", api.GetDomains) // اضافه کردن مسیر جدید برای دریافت دامنه‌ها
 	router.POST("/reload", api.ReloadBind)
 	router.POST("/restart", api.RestartBind)
 	router.POST("/stop", api.StopBind)
@@ -41,6 +42,7 @@ func (api *API) SetupRoutes(router *gin.Engine) {
 	router.GET("/status", api.StatusBind)
 	router.GET("/stats", api.GetStats)
 }
+
 func (api *API) ReloadBind(c *gin.Context) {
 	err := api.bindManager.ReloadBind()
 	if err != nil {
@@ -94,6 +96,7 @@ func (api *API) GetStats(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, stats)
 }
+
 func (api *API) AddDomain(c *gin.Context) {
 	var input struct {
 		Domain string `json:"domain" binding:"required"`
@@ -176,6 +179,16 @@ func (api *API) GetAllRecords(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"ok": true, "records": records})
+}
+
+func (api *API) GetDomains(c *gin.Context) {
+	domains, err := api.bindManager.GetDomains()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "domains": domains})
 }
 
 func StartServer(port string, apiKey string) {

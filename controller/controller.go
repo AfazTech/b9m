@@ -82,12 +82,12 @@ func (bm *BindManager) validateIP(ip string) error {
 }
 
 func (bm *BindManager) domainExists(domain string) (bool, error) {
-	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
-	_, err := os.Stat(zoneFile)
-	if os.IsNotExist(err) {
-		return false, nil
+	domains, err := bm.GetDomains()
+	if err != nil {
+		return false, err
 	}
-	return err == nil, err
+	_, exists := domains[domain]
+	return exists, nil
 }
 
 func (bm *BindManager) AddDomain(domain string, ns1 string, ns2 string) error {
@@ -117,7 +117,7 @@ func (bm *BindManager) AddDomain(domain string, ns1 string, ns2 string) error {
 		return err
 	}
 
-	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
+	zoneFile := fmt.Sprintf("%s/%s.b9m", bm.zoneDir, domain)
 	record := fmt.Sprintf("$TTL 86400\n@ IN SOA %s. admin.%s. ( 2023100101 86400 3600 604800 86400 )\n", ns1, domain)
 	record += fmt.Sprintf("@ IN NS %s.\n", ns1)
 	record += fmt.Sprintf("@ IN NS %s.\n", ns2)
@@ -127,6 +127,7 @@ func (bm *BindManager) AddDomain(domain string, ns1 string, ns2 string) error {
 	}
 	return bm.addZone(domain)
 }
+
 func (bm *BindManager) recordExists(zoneFile, sub string) (bool, error) {
 	data, err := os.ReadFile(zoneFile)
 	if err != nil {
@@ -153,7 +154,16 @@ func (bm *BindManager) DeleteDomain(domain string) error {
 	if !exists {
 		return errors.New("domain does not exist")
 	}
-	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
+
+	domains, err := bm.GetDomains()
+	if err != nil {
+		return err
+	}
+	zoneFile, exists := domains[domain]
+	if !exists {
+		return errors.New("domain file not found")
+	}
+
 	if err := os.Remove(zoneFile); err != nil {
 		return err
 	}
@@ -187,7 +197,14 @@ func (bm *BindManager) AddRecord(domain string, recordType RecordType, sub, valu
 		}
 	}
 
-	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
+	domains, err := bm.GetDomains()
+	if err != nil {
+		return err
+	}
+	zoneFile, exists := domains[domain]
+	if !exists {
+		return errors.New("domain file not found")
+	}
 
 	recordExists, err := bm.recordExists(zoneFile, sub)
 	if err != nil {
@@ -215,7 +232,16 @@ func (bm *BindManager) DeleteRecord(domain, sub string) error {
 	if !exists {
 		return errors.New("domain does not exist")
 	}
-	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
+
+	domains, err := bm.GetDomains()
+	if err != nil {
+		return err
+	}
+	zoneFile, exists := domains[domain]
+	if !exists {
+		return errors.New("domain file not found")
+	}
+
 	return bm.deleteRecord(zoneFile, fmt.Sprintf("%s.%s.", sub, domain))
 }
 
@@ -271,7 +297,7 @@ func contains(slice []RecordType, item RecordType) bool {
 }
 
 func (bm *BindManager) addZone(domain string) error {
-	zoneEntry := fmt.Sprintf("zone \"%s\" {\n\ttype master;\n\tfile \"%s/db.%s\";\n};\n", domain, bm.zoneDir, domain)
+	zoneEntry := fmt.Sprintf("zone \"%s\" {\n\ttype master;\n\tfile \"%s/%s.b9m\";\n};\n", domain, bm.zoneDir, domain)
 
 	data, err := os.ReadFile(bm.namedConfFile)
 	if err != nil {
@@ -346,7 +372,15 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 		return nil, errors.New("domain does not exist")
 	}
 
-	zoneFile := fmt.Sprintf("%s/db.%s", bm.zoneDir, domain)
+	domains, err := bm.GetDomains()
+	if err != nil {
+		return nil, err
+	}
+	zoneFile, exists := domains[domain]
+	if !exists {
+		return nil, errors.New("domain file not found")
+	}
+
 	data, err := os.ReadFile(zoneFile)
 	if err != nil {
 		return nil, err
@@ -455,4 +489,26 @@ func (bm *BindManager) GetStats() (Stats, error) {
 		TotalZones:   len(zones),
 		TotalRouters: routerCount,
 	}, nil
+}
+
+func (bm *BindManager) GetDomains() (map[string]string, error) {
+	data, err := os.ReadFile(bm.namedConfFile)
+	if err != nil {
+		return nil, err
+	}
+
+	domains := make(map[string]string)
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "zone ") && strings.Contains(line, "master") {
+			parts := strings.Fields(line)
+			if len(parts) >= 3 {
+				domain := strings.Trim(parts[1], "\"")
+				filePath := strings.Trim(parts[3], "\";")
+				domains[domain] = filePath
+			}
+		}
+	}
+
+	return domains, nil
 }

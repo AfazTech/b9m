@@ -14,9 +14,9 @@ import (
 var bindManager = controller.NewBindManager("/etc/bind/zones", "/etc/bind/named.conf.local")
 
 var rootCmd = &cobra.Command{
-	Use:   "b9ca",
-	Short: "B9CA Command Line Interface",
-	Long:  "A CLI tool for managing BIND9 configurations and operations in B9CA.",
+	Use:   "b9m",
+	Short: "B9m Command Line Interface",
+	Long:  "A CLI tool for managing BIND9 configurations and operations in b9m.",
 }
 
 var addDomainCmd = &cobra.Command{
@@ -96,7 +96,6 @@ var startAPICmd = &cobra.Command{
 	},
 }
 
-// New commands for Bind operations
 var reloadCmd = &cobra.Command{
 	Use:   "reload",
 	Short: "Reload BIND9 configuration",
@@ -166,6 +165,20 @@ var statsCmd = &cobra.Command{
 	},
 }
 
+var getDomainsCmd = &cobra.Command{
+	Use:   "get-domains",
+	Short: "Get all domains and their configuration files",
+	Run: func(cmd *cobra.Command, args []string) {
+		domains, err := bindManager.GetDomains()
+		if err != nil {
+			log.Fatalf("Error fetching domains: %v", err)
+		}
+		for domain, file := range domains {
+			fmt.Printf("Domain: %s, File: %s\n", domain, file)
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(
 		addDomainCmd,
@@ -180,6 +193,7 @@ func init() {
 		startCmd,
 		statusCmd,
 		statsCmd,
+		getDomainsCmd,
 	)
 }
 
