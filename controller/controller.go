@@ -399,7 +399,6 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 		if len(parts) < 4 {
 			continue
 		}
-
 		name := parts[0]
 
 		ttl := 3600
@@ -413,6 +412,10 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 
 		if !strings.HasSuffix(name, domain+".") && !strings.HasSuffix(name, ".") {
 			name = name + "." + domain + "."
+		}
+
+		if !strings.Contains(line, "IN") {
+			value = "IN " + value
 		}
 
 		record := DNSRecord{
