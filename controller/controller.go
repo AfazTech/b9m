@@ -399,6 +399,7 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 		if len(parts) < 4 {
 			continue
 		}
+
 		name := parts[0]
 
 		ttl := 3600
