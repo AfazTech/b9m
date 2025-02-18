@@ -499,13 +499,26 @@ func (bm *BindManager) GetDomains() (map[string]string, error) {
 
 	domains := make(map[string]string)
 	lines := strings.Split(string(data), "\n")
+
+	var currentDomain string
 	for _, line := range lines {
-		if strings.Contains(line, "zone ") && strings.Contains(line, "master") {
+		line = strings.TrimSpace(line)
+
+		if strings.HasPrefix(line, "zone ") {
 			parts := strings.Fields(line)
-			if len(parts) >= 3 {
-				domain := strings.Trim(parts[1], "\"")
-				filePath := strings.Trim(parts[3], "\";")
-				domains[domain] = filePath
+			if len(parts) >= 2 {
+				currentDomain = strings.Trim(parts[1], "\"")
+			}
+		}
+		if strings.Contains(line, "file") && currentDomain != "" {
+			parts := strings.Fields(line)
+			for i := 0; i < len(parts); i++ {
+				if parts[i] == "file" && i+1 < len(parts) {
+					filePath := strings.Trim(parts[i+1], "\";")
+					domains[currentDomain] = filePath
+					currentDomain = ""
+					break
+				}
 			}
 		}
 	}
