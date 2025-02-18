@@ -417,6 +417,8 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 
 		if !strings.Contains(line, "IN") {
 			value = "IN " + value
+		} else {
+			value = strings.Replace(value, "IN ", "", 1)
 		}
 
 		record := DNSRecord{
