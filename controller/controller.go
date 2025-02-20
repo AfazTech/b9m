@@ -364,28 +364,7 @@ func (bm *BindManager) reloadBind() error {
 }
 
 func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
-	if err := bm.validateDomain(domain); err != nil {
-		return nil, err
-	}
-
-	exists, err := bm.domainExists(domain)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.New("domain does not exist")
-	}
-
-	domains, err := bm.GetDomains()
-	if err != nil {
-		return nil, err
-	}
-	zoneFile, exists := domains[domain]
-	if !exists {
-		return nil, errors.New("domain file not found")
-	}
-
-	data, err := os.ReadFile(zoneFile)
+	data, err := os.ReadFile("/var/lib/bind/" + domain + ".hosts")
 	if err != nil {
 		return nil, err
 	}
@@ -393,46 +372,34 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 	lines := strings.Split(string(data), "\n")
 	var records []DNSRecord
 
+	re := regexp.MustCompile(`^([^;\s]+)\s+(\d+)?\s*IN\s+(A|AAAA|CNAME|MX|TXT|NS|PTR)\s+(.+)$`)
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-
-		if line == "" || strings.HasPrefix(line, ";") || strings.HasPrefix(line, "$") {
+		if line == "" || strings.HasPrefix(line, "$") || strings.HasPrefix(line, ";") {
 			continue
 		}
 
-		parts := strings.Fields(line)
-		if len(parts) < 4 {
+		matches := re.FindStringSubmatch(line)
+		if matches == nil {
 			continue
 		}
 
-		name := parts[0]
+		name := matches[1]
 		if name == "@" {
 			name = domain + "."
 		}
 
 		ttl := 3600
-		if _, err := strconv.Atoi(parts[1]); err == nil {
-			ttl, _ = strconv.Atoi(parts[1])
-			parts = parts[1:]
-		}
-
-		recordType := RecordType(parts[1])
-
-		if recordType == "SOA" {
-			continue
-		}
-
-		value := strings.Join(parts[2:], " ")
-
-		if !strings.HasSuffix(name, domain+".") && !strings.HasSuffix(name, ".") {
-			name = name + "." + domain + "."
+		if matches[2] != "" {
+			ttl, _ = strconv.Atoi(matches[2])
 		}
 
 		record := DNSRecord{
 			Name:  name,
 			TTL:   ttl,
-			Type:  recordType,
-			Value: value,
+			Type:  RecordType(matches[3]),
+			Value: matches[4],
 		}
 		records = append(records, record)
 	}
