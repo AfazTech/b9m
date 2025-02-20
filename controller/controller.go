@@ -395,6 +395,7 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
+
 		if line == "" || strings.HasPrefix(line, ";") || strings.HasPrefix(line, "$") {
 			continue
 		}
@@ -416,16 +417,15 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 		}
 
 		recordType := RecordType(parts[1])
+
+		if recordType == "SOA" {
+			continue
+		}
+
 		value := strings.Join(parts[2:], " ")
 
 		if !strings.HasSuffix(name, domain+".") && !strings.HasSuffix(name, ".") {
 			name = name + "." + domain + "."
-		}
-
-		if !strings.Contains(line, "IN") {
-			value = "IN " + value
-		} else {
-			value = strings.Replace(value, "IN ", "", 1)
 		}
 
 		record := DNSRecord{
