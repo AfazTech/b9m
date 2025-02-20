@@ -81,7 +81,7 @@ var getRecordsCmd = &cobra.Command{
 			log.Fatalf("Error: %v", err)
 		}
 		for _, record := range records {
-			fmt.Printf("%s %d IN %s %s\n", record.Name, record.TTL, record.Type, record.Value)
+			fmt.Printf("%s %d %s %s\n", record.Name, record.TTL, record.Type, record.Value)
 		}
 	},
 }
