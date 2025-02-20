@@ -31,6 +31,7 @@ type RecordType string
 
 const (
 	A     RecordType = "A"
+	AAAA  RecordType = "AAAA"
 	CNAME RecordType = "CNAME"
 	TXT   RecordType = "TXT"
 	MX    RecordType = "MX"
@@ -47,6 +48,9 @@ func NewBindManager(zoneDir string, namedConfFile string) *BindManager {
 }
 
 func (bm *BindManager) validateSubdomain(sub string) error {
+	if sub == "@" {
+		return nil
+	}
 	matched, _ := regexp.MatchString(`^[a-zA-Z0-9-]{1,63}$`, sub)
 	if !matched {
 		return fmt.Errorf("invalid subdomain format: %s", sub)
@@ -187,11 +191,11 @@ func (bm *BindManager) AddRecord(domain string, recordType RecordType, sub, valu
 	if ttl <= 0 {
 		return errors.New("TTL must be greater than 0")
 	}
-	validRecordTypes := []RecordType{A, CNAME, TXT, MX, NS, PTR}
+	validRecordTypes := []RecordType{A, AAAA, CNAME, TXT, MX, NS, PTR}
 	if !contains(validRecordTypes, recordType) {
 		return errors.New("invalid record type")
 	}
-	if recordType == A {
+	if recordType == A || recordType == AAAA {
 		if err := bm.validateIP(value); err != nil {
 			return err
 		}
@@ -401,6 +405,9 @@ func (bm *BindManager) GetAllRecords(domain string) ([]DNSRecord, error) {
 		}
 
 		name := parts[0]
+		if name == "@" {
+			name = domain + "."
+		}
 
 		ttl := 3600
 		if _, err := strconv.Atoi(parts[1]); err == nil {
