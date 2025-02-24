@@ -210,15 +210,14 @@ func (bm *BindManager) AddRecord(domain string, recordType RecordType, sub, valu
 		return errors.New("domain file not found")
 	}
 
-	recordExists, err := bm.recordExists(zoneFile, sub)
-	if err != nil {
-		return err
-	}
-	if recordExists {
-		return fmt.Errorf("record with subdomain %s already exists", sub)
+	var recordName string
+	if sub == "@" {
+		recordName = domain + "."
+	} else {
+		recordName = fmt.Sprintf("%s.%s.", sub, domain)
 	}
 
-	record := fmt.Sprintf("%s.%s. %d IN %s %s", sub, domain, ttl, recordType, value)
+	record := fmt.Sprintf("%s %d IN %s %s", recordName, ttl, recordType, value)
 	return bm.addRecord(zoneFile, record)
 }
 
