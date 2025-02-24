@@ -2,7 +2,7 @@
 
 use Exception;
 
-class B9mApi {
+class B9m {
     private $baseUrl;
     private $apiKey;
 
