@@ -20,7 +20,7 @@ func NewAPI(bindManager *controller.BindManager, apiKey string) *API {
 
 func (api *API) authMiddleware(c *gin.Context) {
 	if c.GetHeader("Authorization") != "Bearer "+api.apiKey {
-		c.JSON(http.StatusUnauthorized, gin.H{"ok": true, "error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"ok": flase, "error": "Unauthorized"})
 		c.Abort()
 		return
 	}
@@ -34,7 +34,7 @@ func (api *API) SetupRoutes(router *gin.Engine) {
 	router.POST("/domains/:domain/records", api.AddRecord)
 	router.DELETE("/domains/:domain/records/:name", api.DeleteRecord)
 	router.GET("/domains/:domain/records", api.GetAllRecords)
-	router.GET("/domains", api.GetDomains) // اضافه کردن مسیر جدید برای دریافت دامنه‌ها
+	router.GET("/domains", api.GetDomains)
 	router.POST("/reload", api.ReloadBind)
 	router.POST("/restart", api.RestartBind)
 	router.POST("/stop", api.StopBind)
