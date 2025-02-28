@@ -20,7 +20,7 @@ func NewAPI(bindManager *controller.BindManager, apiKey string) *API {
 
 func (api *API) authMiddleware(c *gin.Context) {
 	if c.GetHeader("Authorization") != "Bearer "+api.apiKey {
-		c.JSON(http.StatusUnauthorized, gin.H{"ok": flase, "error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"ok": false, "error": "Unauthorized"})
 		c.Abort()
 		return
 	}
