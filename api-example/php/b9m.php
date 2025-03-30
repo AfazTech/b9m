@@ -27,7 +27,7 @@ class B9m {
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_TIMEOUT=>3,
+            CURLOPT_TIMEOUT => 3,
         ];
         
         if ($method === 'POST' || $method === 'PUT') {
@@ -46,8 +46,8 @@ class B9m {
         }
         
         $decodedResponse = json_decode($response, true);
-        if (!$decodedResponse['ok']){
-            throw new Exception(message: $decodedResponse['message']);
+        if (!isset($decodedResponse['ok']) || !$decodedResponse['ok']) {
+            throw new Exception($decodedResponse['message'] ?? 'Unknown error');
         }
         return $decodedResponse;
     }
@@ -55,8 +55,8 @@ class B9m {
     public function addDomain($domain, $ns1, $ns2) {
         return $this->request('POST', 'domains', [
             'domain' => $domain,
-            'ns1' => $ns1,
-            'ns2' => $ns2
+            'ns1'    => $ns1,
+            'ns2'    => $ns2
         ]);
     }
 
@@ -66,15 +66,15 @@ class B9m {
 
     public function addRecord($domain, $name, $type, $value, $ttl) {
         return $this->request('POST', "domains/$domain/records", [
-            'name' => $name,
-            'type' => $type,
+            'name'  => $name,
+            'type'  => $type,
             'value' => $value,
-            'ttl' => $ttl
+            'ttl'   => $ttl
         ]);
     }
 
-    public function deleteRecord($domain, $name) {
-        return $this->request('DELETE', "domains/$domain/records/$name");
+    public function deleteRecord($domain, $name, $type, $value) {
+        return $this->request('DELETE', "domains/$domain/records/$name/$type/$value");
     }
 
     public function getAllRecords($domain) {
@@ -101,12 +101,7 @@ class B9m {
         return $this->request('GET', 'status');
     }
 
-    public function getStats() {
-        return $this->request('GET', 'stats');
-    }
-
     public function getDomains() {
         return $this->request('GET', 'domains');
     }
-    
 }

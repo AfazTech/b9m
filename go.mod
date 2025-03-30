@@ -1,4 +1,4 @@
-module github.com/imafaz/b9m
+module github.com/AfazTech/b9m
 
 go 1.23.3
 
@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/AfazTech/logger/v2 v2.0.0 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect

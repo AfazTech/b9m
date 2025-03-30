@@ -1,21 +1,23 @@
 package api
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 
+	"github.com/AfazTech/b9m/parser"
+	"github.com/AfazTech/b9m/record"
+	"github.com/AfazTech/b9m/servicemanager"
+	"github.com/AfazTech/b9m/zone"
+	"github.com/AfazTech/logger/v2"
 	"github.com/gin-gonic/gin"
-	"github.com/imafaz/b9m/controller"
 )
 
 type API struct {
-	bindManager *controller.BindManager
-	apiKey      string
+	apiKey string
 }
 
-func NewAPI(bindManager *controller.BindManager, apiKey string) *API {
-	return &API{bindManager: bindManager, apiKey: apiKey}
+func NewAPI(apiKey string) *API {
+	return &API{apiKey: apiKey}
 }
 
 func (api *API) authMiddleware(c *gin.Context) {
@@ -32,7 +34,7 @@ func (api *API) SetupRoutes(router *gin.Engine) {
 	router.POST("/domains", api.AddDomain)
 	router.DELETE("/domains/:domain", api.DeleteDomain)
 	router.POST("/domains/:domain/records", api.AddRecord)
-	router.DELETE("/domains/:domain/records/:name", api.DeleteRecord)
+	router.DELETE("/domains/:domain/records/:name/:type/:value", api.DeleteRecord)
 	router.GET("/domains/:domain/records", api.GetAllRecords)
 	router.GET("/domains", api.GetDomains)
 	router.POST("/reload", api.ReloadBind)
@@ -40,11 +42,10 @@ func (api *API) SetupRoutes(router *gin.Engine) {
 	router.POST("/stop", api.StopBind)
 	router.POST("/start", api.StartBind)
 	router.GET("/status", api.StatusBind)
-	router.GET("/stats", api.GetStats)
 }
 
 func (api *API) ReloadBind(c *gin.Context) {
-	err := api.bindManager.ReloadBind()
+	err := servicemanager.ReloadBind()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
@@ -53,7 +54,7 @@ func (api *API) ReloadBind(c *gin.Context) {
 }
 
 func (api *API) RestartBind(c *gin.Context) {
-	err := api.bindManager.RestartBind()
+	err := servicemanager.RestartBind()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
@@ -62,7 +63,7 @@ func (api *API) RestartBind(c *gin.Context) {
 }
 
 func (api *API) StopBind(c *gin.Context) {
-	err := api.bindManager.StopBind()
+	err := servicemanager.StopBind()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
@@ -71,7 +72,7 @@ func (api *API) StopBind(c *gin.Context) {
 }
 
 func (api *API) StartBind(c *gin.Context) {
-	err := api.bindManager.StartBind()
+	err := servicemanager.StartBind()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
@@ -80,21 +81,12 @@ func (api *API) StartBind(c *gin.Context) {
 }
 
 func (api *API) StatusBind(c *gin.Context) {
-	status, err := api.bindManager.StatusBind()
+	status, err := servicemanager.StatusBind()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": status})
-}
-
-func (api *API) GetStats(c *gin.Context) {
-	stats, err := api.bindManager.GetStats()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, stats)
 }
 
 func (api *API) AddDomain(c *gin.Context) {
@@ -109,7 +101,7 @@ func (api *API) AddDomain(c *gin.Context) {
 		return
 	}
 
-	err := api.bindManager.AddDomain(input.Domain, input.NS1, input.NS2)
+	err := zone.AddDomain(input.Domain, input.NS1, input.NS2)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
@@ -120,7 +112,7 @@ func (api *API) AddDomain(c *gin.Context) {
 
 func (api *API) DeleteDomain(c *gin.Context) {
 	domain := c.Param("domain")
-	err := api.bindManager.DeleteDomain(domain)
+	err := zone.DeleteDomain(domain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
@@ -131,10 +123,10 @@ func (api *API) DeleteDomain(c *gin.Context) {
 
 func (api *API) AddRecord(c *gin.Context) {
 	var input struct {
-		Name  string                `json:"name" binding:"required"`
-		Type  controller.RecordType `json:"type" binding:"required"`
-		Value string                `json:"value" binding:"required"`
-		TTL   string                `json:"ttl" binding:"required"`
+		Name  string            `json:"name" binding:"required"`
+		Type  record.RecordType `json:"type" binding:"required"`
+		Value string            `json:"value" binding:"required"`
+		TTL   string            `json:"ttl" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -149,7 +141,7 @@ func (api *API) AddRecord(c *gin.Context) {
 	}
 
 	domain := c.Param("domain")
-	err = api.bindManager.AddRecord(domain, input.Type, input.Name, input.Value, ttl)
+	err = record.AddRecord(domain, input.Type, input.Name, input.Value, ttl)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
@@ -161,18 +153,19 @@ func (api *API) AddRecord(c *gin.Context) {
 func (api *API) DeleteRecord(c *gin.Context) {
 	domain := c.Param("domain")
 	name := c.Param("name")
-	err := api.bindManager.DeleteRecord(domain, name)
+	rType := c.Param("type")
+	value := c.Param("value")
+	err := record.DeleteRecord(domain, name, record.RecordType(rType), value)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Record deleted successfully"})
 }
 
 func (api *API) GetAllRecords(c *gin.Context) {
 	domain := c.Param("domain")
-	records, err := api.bindManager.GetAllRecords(domain)
+	records, err := record.GetAllRecords(domain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
@@ -182,7 +175,7 @@ func (api *API) GetAllRecords(c *gin.Context) {
 }
 
 func (api *API) GetDomains(c *gin.Context) {
-	domains, err := api.bindManager.GetDomains()
+	domains, err := parser.GetDomains()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
@@ -192,13 +185,12 @@ func (api *API) GetDomains(c *gin.Context) {
 }
 
 func StartServer(port string, apiKey string) {
-	bindManager := controller.NewBindManager("/etc/bind/zones", "/etc/bind/named.conf.local")
-	api := NewAPI(bindManager, apiKey)
+	api := NewAPI(apiKey)
 	router := gin.Default()
 	api.SetupRoutes(router)
 
-	log.Printf("Starting API server on port %s", port)
+	logger.Infof("Starting API server on port %s", port)
 	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("Failed to run server: %v", err)
+		logger.Fatalf("Failed to run server: %v", err)
 	}
 }
