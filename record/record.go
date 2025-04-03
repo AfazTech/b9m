@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/AfazTech/b9m/parser"
 	"github.com/AfazTech/b9m/servicemanager"
@@ -93,7 +94,6 @@ func AddRecord(domain string, recordType RecordType, sub, value string, ttl int)
 	}
 	return servicemanager.ReloadBind()
 }
-
 func DeleteRecord(domain, sub string, rType RecordType, value string) error {
 	if err := utils.ValidateDomain(domain); err != nil {
 		return fmt.Errorf("failed to delete record from domain %s: %w", domain, err)
@@ -101,6 +101,7 @@ func DeleteRecord(domain, sub string, rType RecordType, value string) error {
 	if err := utils.ValidateSubdomain(sub); err != nil {
 		return fmt.Errorf("failed to delete record from domain %s, invalid subdomain %s: %w", domain, sub, err)
 	}
+
 	exists, err := utils.DomainExists(domain)
 	if err != nil {
 		return fmt.Errorf("error checking existence of domain %s: %w", domain, err)
@@ -108,28 +109,33 @@ func DeleteRecord(domain, sub string, rType RecordType, value string) error {
 	if !exists {
 		return fmt.Errorf("domain does not exist: %s", domain)
 	}
+
 	domains, err := parser.GetDomains()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve domains for deleting record from %s: %w", domain, err)
 	}
+
 	zoneFile, exists := domains[domain]
 	if !exists {
 		return fmt.Errorf("zone file not found for domain: %s", domain)
 	}
+
 	data, err := os.ReadFile(zoneFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read zone file for domain %s: %w", domain, err)
 	}
 
-	pattern := fmt.Sprintf(`(?m)^\s*%s\s+(?:\d+\s+)?(?:\S+\s+)?%s\s+%s\s*$`, regexp.QuoteMeta(sub), regexp.QuoteMeta(string(rType)), regexp.QuoteMeta(value))
+	pattern := fmt.Sprintf(`(?m)^\s*%s(?:\s+\d+)?\s+IN\s+%s\s+%s\s*$`,
+		regexp.QuoteMeta(sub), regexp.QuoteMeta(string(rType)), regexp.QuoteMeta(value))
 	re := regexp.MustCompile(pattern)
-
 	newData := re.ReplaceAllString(string(data), "")
+	newData = strings.TrimSpace(newData)
 
-	err = os.WriteFile(zoneFile, []byte(newData), 0644)
+	err = os.WriteFile(zoneFile, []byte(newData), 0666)
 	if err != nil {
-		return fmt.Errorf("failed to delete record from domain %s: %w", domain, err)
+		return fmt.Errorf("failed to write updated zone file for domain %s: %w", domain, err)
 	}
+
 	return servicemanager.ReloadBind()
 }
 
