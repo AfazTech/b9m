@@ -125,11 +125,16 @@ func DeleteRecord(domain, sub string, rType RecordType, value string) error {
 		return fmt.Errorf("failed to read zone file for domain %s: %w", domain, err)
 	}
 
-	pattern := fmt.Sprintf(`(?m)^\s*%s(?:\s+\d+)?\s+IN\s+%s\s+%s\s*$`,
-		regexp.QuoteMeta(sub), regexp.QuoteMeta(string(rType)), regexp.QuoteMeta(value))
+	pattern := fmt.Sprintf(`(?m)^\s*%s\.\s*(?:\d+\s+)?IN\s+%s\s+%s\s*$`,
+		regexp.QuoteMeta(sub+"."+domain), regexp.QuoteMeta(string(rType)), regexp.QuoteMeta(value))
 	re := regexp.MustCompile(pattern)
+
 	newData := re.ReplaceAllString(string(data), "")
-	newData = strings.TrimSpace(newData)
+	newData = strings.TrimSpace(newData) + "\n"
+
+	if string(data) == newData {
+		return fmt.Errorf("record not found or could not be deleted: %s.%s IN %s %s", sub, domain, rType, value)
+	}
 
 	err = os.WriteFile(zoneFile, []byte(newData), 0666)
 	if err != nil {

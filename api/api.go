@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -160,7 +161,7 @@ func (api *API) DeleteRecord(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"ok": false, "message": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "Record deleted successfully"})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": fmt.Sprintf("Record deleted successfully: Domain: '%s', Name: '%s', Type: '%s', Value: '%s'.", domain, name, rType, value)})
 }
 
 func (api *API) GetAllRecords(c *gin.Context) {
